@@ -21,6 +21,10 @@ class ECGDataset(Dataset):
     def __getitem__(self, idx):
         signal = torch.tensor(self.signals[idx], dtype=torch.float32)
         label = torch.tensor(self.labels.iloc[idx].item(), dtype=torch.long)
+        
+        # normalization step -- scale can be different among patients
+        signal = (signal - signal.mean()) / (signal.std() + 1e-6)
+        
         return signal, label
 
 # allows the model to handle variable-length input using dynamic operations like STFT or sequence models (e.g., RNNs) without needing to pad signals in advance
