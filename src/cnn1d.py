@@ -25,6 +25,7 @@ class CNN1DModel(nn.Module):
             nn.Conv1d(32, 64, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm1d(64),
             nn.ReLU(),
+            nn.Dropout(0.25),
             nn.AdaptiveAvgPool1d(1)  # (batch size, 64, 1)
         )
         self.classifier = nn.Linear(64, n_classes)
@@ -51,4 +52,3 @@ class CNN1DModel(nn.Module):
 
 
 
-    
