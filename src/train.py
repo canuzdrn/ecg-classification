@@ -1,5 +1,6 @@
 import time
 from src.train_utils import train_one_epoch, evaluate
+import torch
 
 
 def train_model(model,train_loader,val_loader,optimizer,loss_fn,device,num_epochs=10):
@@ -15,12 +16,16 @@ def train_model(model,train_loader,val_loader,optimizer,loss_fn,device,num_epoch
     # best model state (dict) -- None at the start
     best_model_state = None
 
+    # learning rate scheduler -- decrease lr on plateau, let the model decide the lr
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode="max",factor=0.5,patience=2,verbose=False)
+
     # training loop
     for epoch in range(1, num_epochs + 1):
         start_time = time.time()
 
         train_loss, train_acc, train_f1 = train_one_epoch(model, train_loader, optimizer, loss_fn, device)
         val_loss, val_acc, val_f1 = evaluate(model, val_loader, loss_fn, device)
+        scheduler.step(val_f1)
 
         duration = time.time() - start_time
 
