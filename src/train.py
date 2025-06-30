@@ -17,7 +17,7 @@ def train_model(model,train_loader,val_loader,optimizer,loss_fn,device,num_epoch
     best_model_state = None
 
     # learning rate scheduler -- decrease lr on plateau, let the model decide the lr
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode="max",factor=0.5,patience=2,verbose=False)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode="max",factor=0.5,patience=2)
 
     # training loop
     for epoch in range(1, num_epochs + 1):
@@ -26,6 +26,10 @@ def train_model(model,train_loader,val_loader,optimizer,loss_fn,device,num_epoch
         train_loss, train_acc, train_f1 = train_one_epoch(model, train_loader, optimizer, loss_fn, device)
         val_loss, val_acc, val_f1 = evaluate(model, val_loader, loss_fn, device)
         scheduler.step(val_f1)
+
+        # Check the updated LR
+        for param_group in optimizer.param_groups:
+            print("Current learning rate:", param_group["lr"])
 
         duration = time.time() - start_time
 

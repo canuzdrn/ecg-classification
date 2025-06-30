@@ -6,75 +6,84 @@ class BaselineSTFTModel(nn.Module):
     """
     (init params)
     n_classes: # of output classes
-    n_fft: size of the fft window
-    hop_length: # of sample between stft windows
+    n_fft: size of the FFT window (=> freq_bins = n_fft//2 + 1)
+    hop_length: # of samples between STFT windows
     """
-    def __init__(self, n_classes=4, n_fft=256, hop_length=64):
+    def __init__(self, n_classes=4, n_fft=256, hop_length=128):
         super().__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
 
-        # first conv2d layer
-        # expects input of shape (batch, 1, freq, time)
+        # after STFT we have 1 channel; freq_bins = n_fft//2 +1
+        # conv1: 1→16 channels, preserves (freq, time) via padding=1
+        # then BatchNorm2d(16) normalizes those 16 feature‐maps
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, padding=1),
+            nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
+        # now shape is (batch,16, freq/2, time/2)
 
-        # second conv2d layer
+        # conv2: 16->32 channels, again padding=1 so no spatial shrink before pooling
+        # BatchNorm2d(32) normalizes the 32 feature‐maps
         self.conv2 = nn.Sequential(
             nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
+        # now shape is (batch,32, freq/4, time/4)
 
-        # gru layer
-        # expects input: (batch, time, features)
-        self.rnn = nn.GRU(input_size=1024, hidden_size=64, batch_first=True)
+        # Compute GRU input size dynamically
+        self.input_size = self._compute_input_size(n_fft)
 
-        # fcnn layer for classification
+        # GRU expects input_size = channels * freq_out
+        # Here channels=32, freq_out=(n_fft//2+1)//4 (≈32 for n_fft=256),
+        # so 32*32 = 1024
+        self.rnn = nn.GRU(input_size=self.input_size, hidden_size=64, batch_first=True)
+
+        # final linear maps the 64‐dim hidden state -> n_classes
         self.fc = nn.Linear(64, n_classes)
 
+    def _compute_input_size(self, n_fft):
+        freq_bins = n_fft // 2 + 1
+        freq_out = freq_bins // 4  # two MaxPool layers each divide by 2
+        return 32 * freq_out
+
     def forward(self, x, lengths):
-        """
-        x: list of raw ecg signals (batch of 1D tensors of different lengths)
-        lengths: list or tensor of original lengths
-        """
         batch_size = len(x)
 
-        # apply STFT and stack into a padded batch of spectrograms
+        # --- STFT -> log‑mag spectrogram ---
         spectrograms = []
         for signal in x:
-            stft_result = torch.stft(
-                signal,
-                n_fft=self.n_fft,
-                hop_length=self.hop_length,
-                return_complex=True
-            )
-            magnitude = torch.log1p(torch.abs(stft_result))  # (freq, time)
-            spectrograms.append(magnitude)
+            S = torch.stft(signal,
+                           n_fft=self.n_fft,
+                           hop_length=self.hop_length,
+                           return_complex=True)
+            mag = torch.log1p(torch.abs(S))  # (freq_bins, time_frames)
+            spectrograms.append(mag)
 
-        # pad spectrograms and stack into (batch, 1, freq, time)
+        # pad to (batch, 1, max_freq, max_time)
         freqs = [s.shape[0] for s in spectrograms]
         times = [s.shape[1] for s in spectrograms]
-        max_f = max(freqs)
-        max_t = max(times)
-
-        padded = torch.zeros(batch_size, 1, max_f, max_t)
+        max_f, max_t = max(freqs), max(times)
+        padded = torch.zeros(batch_size, 1, max_f, max_t, device=spectrograms[0].device)
         for i, s in enumerate(spectrograms):
             padded[i, 0, :s.shape[0], :s.shape[1]] = s
 
-        x = self.conv1(padded)
-        x = self.conv2(x)
+        # --- Conv layers with BatchNorm ---
+        x = self.conv1(padded)  # (B,16, max_f/2, max_t/2)
+        x = self.conv2(x)       # (B,32, max_f/4, max_t/4)
 
-        # Preprocess for rnn : (batch, features, time) to (batch, time, features)
+        # reshape to (batch, time, features)
         b, c, f, t = x.shape
-        x = x.view(b, c * f, t).permute(0, 2, 1)
+        x = x.view(b, c * f, t).permute(0, 2, 1)  # (B, time, 32*f)
 
-        # apply rnn
-        _, h = self.rnn(x)  # h: (1, B, H)
-        # use final hidden state
-        x = self.fc(h[-1])
+        # --- RNN ---
+        _, h = self.rnn(x)      # h: (1, B, 64)
+        h_last = h[-1]          # (B, 64)
 
-        return x
+        # --- final classification ---
+        out = self.fc(h_last)   # (B, n_classes)
+        return out

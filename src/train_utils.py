@@ -33,7 +33,7 @@ def train_one_epoch(model, dataloader, optimizer, loss_fn, device):
 
     avg_loss = total_loss / len(dataloader)
     acc = accuracy_score(all_labels, all_preds)
-    f1 = f1_score(all_labels, all_preds, average="macro")
+    f1 = f1_score(all_labels, all_preds, average="weighted")  # using weighted average to account for class imbalance
     return avg_loss, acc, f1
 
 def evaluate(model, dataloader, loss_fn, device):
@@ -64,10 +64,10 @@ def evaluate(model, dataloader, loss_fn, device):
 
     avg_loss = total_loss / len(dataloader)
     acc = accuracy_score(all_labels, all_preds)
-    f1 = f1_score(all_labels, all_preds, average="macro")
+    f1 = f1_score(all_labels, all_preds, average="weighted") # using weighted average to account for class imbalance 
 
     # uncomment below line to log -- observe whether there is any one-class collapse situation
-    # print("Unique predictions:", np.unique(all_preds, return_counts=True))
+    print("Unique predictions:", np.unique(all_preds, return_counts=True))
 
     return avg_loss, acc, f1
 
