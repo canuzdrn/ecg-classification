@@ -40,7 +40,9 @@ class CNN1DModel(nn.Module):
         padded = torch.zeros(len(x_list), 1, max_len, device=x_list[0].device)
 
         for i, x in enumerate(x_list):
-            padded[i, 0, :x.size(0)] = x  # zero padding at the end (TODO : maybe divide padding into begining and end?)
+            repeats = (max_len + len(x) - 1) // len(x)  # ceil(max_len / len(x))
+            x_tiled = x.repeat(repeats)[:max_len]
+            padded[i, 0] = x_tiled
 
         x = self.net(padded)  # (batch, 64, 1)
         x = x.squeeze(-1)     # (batch, 64)
