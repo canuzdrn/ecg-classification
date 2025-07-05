@@ -2,7 +2,7 @@ from sklearn.metrics import f1_score, accuracy_score
 import torch
 import numpy as np
 
-def train_one_epoch(model, dataloader, optimizer, loss_fn, device):
+def train_one_epoch(model, dataloader, optimizer, loss_fn, device, scheduler=None):
     """
     training function that's used in the training loop
     enhanced modularity by writing an additional function for one epoch training
@@ -24,6 +24,10 @@ def train_one_epoch(model, dataloader, optimizer, loss_fn, device):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+        # step the OneCycleLR scheduler if provided
+        if scheduler is not None:
+            scheduler.step()
 
         # update metrics
         total_loss += loss.item()
@@ -64,13 +68,9 @@ def evaluate(model, dataloader, loss_fn, device):
 
     avg_loss = total_loss / len(dataloader)
     acc = accuracy_score(all_labels, all_preds)
-    f1 = f1_score(all_labels, all_preds, average="macro") # using weighted average to account for class imbalance 
+    f1 = f1_score(all_labels, all_preds, average="macro")  # using macro average for class balance
 
     # uncomment below line to log -- observe whether there is any one-class collapse situation
     print("Unique predictions:", np.unique(all_preds, return_counts=True))
 
     return avg_loss, acc, f1
-
-
-
-

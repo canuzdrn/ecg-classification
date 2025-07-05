@@ -1,6 +1,8 @@
 import time
 from src.train_utils import train_one_epoch, evaluate
 import torch
+from torch.optim.lr_scheduler import OneCycleLR
+from src.train_utils import evaluate
 
 def train_model(model, train_loader, val_loader, optimizer, loss_fn, device, num_epochs=10):
     """
@@ -26,16 +28,27 @@ def train_model(model, train_loader, val_loader, optimizer, loss_fn, device, num
         "val_f1": []
     }
 
-    # learning rate scheduler -- decrease lr on plateau, let the model decide the lr
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
+    # ONE‐CYCLE LR Scheduler preferred since it adapts learning rate dynamically
+    scheduler = OneCycleLR(
+        optimizer,
+        max_lr=1e-3,                    # peak LR
+        steps_per_epoch=len(train_loader),
+        epochs=num_epochs,
+        pct_start=0.3,                  # 30% of cycle spent ramping up
+        anneal_strategy="cos",          # cosine annealing down
+        div_factor=25.0,                # initial LR = max_lr / div_factor
+        final_div_factor=1e4            # final LR = max_lr / final_div_factor
+    )
 
     # training loop
     for epoch in range(1, num_epochs + 1):
         start_time = time.time()
 
-        train_loss, train_acc, train_f1 = train_one_epoch(model, train_loader, optimizer, loss_fn, device)
+        # pass scheduler into train_one_epoch so it can step per batch
+        train_loss, train_acc, train_f1 = train_one_epoch(
+            model, train_loader, optimizer, loss_fn, device, scheduler
+        )
         val_loss, val_acc, val_f1 = evaluate(model, val_loader, loss_fn, device)
-        scheduler.step(val_f1)
 
         # Save metrics to history
         history["train_loss"].append(train_loss)
@@ -44,10 +57,6 @@ def train_model(model, train_loader, val_loader, optimizer, loss_fn, device, num
         history["val_acc"].append(val_acc)
         history["train_f1"].append(train_f1)
         history["val_f1"].append(val_f1)
-
-        # Check the updated LR
-        for param_group in optimizer.param_groups:
-            print("Current learning rate:", param_group["lr"])
 
         duration = time.time() - start_time
 
