@@ -8,8 +8,9 @@ class BaselineSTFTModel(nn.Module):
     n_classes: # of output classes
     n_fft: size of the FFT window (=> freq_bins = n_fft//2 + 1)
     hop_length: # of samples between STFT windows
+    dropout_rate: dropout probability
     """
-    def __init__(self, n_classes=4, n_fft=256, hop_length=128):
+    def __init__(self, n_classes=4, n_fft=256, hop_length=128, dropout_rate=0.4):
         super().__init__()
         self.n_fft = n_fft
         self.hop_length = hop_length
@@ -38,10 +39,16 @@ class BaselineSTFTModel(nn.Module):
         # Compute GRU input size dynamically
         self.input_size = self._compute_input_size(n_fft)
 
+        # Dropout layer for RNN input
+        # This regularizes the features extracted by the CNNs.
+        self.rnn_input_dropout = nn.Dropout(dropout_rate)
+
         # GRU expects input_size = channels * freq_out
-        # Here channels=32, freq_out=(n_fft//2+1)//4 (≈32 for n_fft=256),
-        # so 32*32 = 1024
         self.rnn = nn.GRU(input_size=self.input_size, hidden_size=64, batch_first=True)
+
+        # Dropout layer for classifier input
+        # This regularizes the final summary vector from the RNN.
+        self.fc_dropout = nn.Dropout(dropout_rate)
 
         # final linear maps the 64‐dim hidden state -> n_classes
         self.fc = nn.Linear(64, n_classes)
@@ -54,12 +61,16 @@ class BaselineSTFTModel(nn.Module):
     def forward(self, x, lengths):
         batch_size = len(x)
 
-        # --- STFT -> log‑mag spectrogram ---
+        # STFT -> log‑mag spectrogram.
         spectrograms = []
         for signal in x:
+            # Window function to STFT call
+            # This improves spectrogram quality and removes the compiler warning.
+            window = torch.hann_window(self.n_fft, device=signal.device)
             S = torch.stft(signal,
                            n_fft=self.n_fft,
                            hop_length=self.hop_length,
+                           window=window,
                            return_complex=True)
             mag = torch.log1p(torch.abs(S))  # (freq_bins, time_frames)
             spectrograms.append(mag)
@@ -72,7 +83,7 @@ class BaselineSTFTModel(nn.Module):
         for i, s in enumerate(spectrograms):
             padded[i, 0, :s.shape[0], :s.shape[1]] = s
 
-        # --- Conv layers with BatchNorm ---
+        # Conv layers with BatchNorm
         x = self.conv1(padded)  # (B,16, max_f/2, max_t/2)
         x = self.conv2(x)       # (B,32, max_f/4, max_t/4)
 
@@ -80,10 +91,16 @@ class BaselineSTFTModel(nn.Module):
         b, c, f, t = x.shape
         x = x.view(b, c * f, t).permute(0, 2, 1)  # (B, time, 32*f)
 
-        # --- RNN ---
-        _, h = self.rnn(x)      # h: (1, B, 64)
-        h_last = h[-1]          # (B, 64)
+        # Apply dropout to RNN input
+        x = self.rnn_input_dropout(x)
 
-        # --- final classification ---
+        # RNN
+        _, h = self.rnn(x)   # h: (1, B, 64)
+        h_last = h[-1]      # (B, 64)
+
+        # Apply dropout to classifier input
+        h_last = self.fc_dropout(h_last)
+
+        # Final classification
         out = self.fc(h_last)   # (B, n_classes)
         return out
