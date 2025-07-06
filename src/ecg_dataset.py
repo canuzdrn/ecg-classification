@@ -32,3 +32,13 @@ def prep_batch(batch):
     signals, labels = zip(*batch)
     lengths = [len(s) for s in signals]
     return list(signals), torch.tensor(labels), lengths
+
+# Gaussian noise augmentation
+def prep_batch_noisy(batch, noise_std=0.01):
+    signals, labels = zip(*batch)
+    lengths = [len(s) for s in signals]
+    
+    # Add Gaussian noise to each signal
+    noisy_signals = [s + torch.randn_like(s) * noise_std for s in signals]
+    
+    return list(noisy_signals), torch.tensor(labels), lengths
