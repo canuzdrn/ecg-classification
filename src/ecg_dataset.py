@@ -42,3 +42,21 @@ def prep_batch_noisy(batch, noise_std=0.01):
     noisy_signals = [s + torch.randn_like(s) * noise_std for s in signals]
     
     return list(noisy_signals), torch.tensor(labels), lengths
+
+
+# below dataset function and collate functions for test dataset
+class ECGTestDataset(Dataset):
+    def __init__(self, signals):
+        self.signals = signals
+
+    def __len__(self):
+        return len(self.signals)
+
+    def __getitem__(self, idx):
+        signal = torch.tensor(self.signals[idx], dtype=torch.float32)
+        signal = (signal - signal.mean()) / (signal.std() + 1e-6)
+        return signal
+    
+def prep_test_batch(batch):     # collate_fn for test (no labels)
+    lengths = [len(s) for s in batch]
+    return list(batch), lengths
