@@ -31,7 +31,7 @@ def train_model(model, train_loader, val_loader, optimizer, loss_fn, device, num
     # ONE‐CYCLE LR Scheduler preferred since it adapts learning rate dynamically
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=1e-3,                    # peak LR
+        max_lr=2e-3,                    # peak LR
         steps_per_epoch=len(train_loader),
         epochs=num_epochs,
         pct_start=0.3,                  # 30% of cycle spent ramping up
