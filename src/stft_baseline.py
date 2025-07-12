@@ -8,7 +8,7 @@ class BaselineSTFTModel(nn.Module):
     n_classes: # of output classes
     n_fft: size of the FFT window (=> freq_bins = n_fft//2 + 1)
     hop_length: # of samples between STFT windows
-    dropout_rate: dropout probability
+    dropout_rate: dropout probability.
     """
     def __init__(self, n_classes=4, n_fft=256, hop_length=128, dropout_rate=0.4):
         super().__init__()
