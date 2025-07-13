@@ -142,6 +142,11 @@ class BaselineSTFTFeaturedModel(nn.Module):
         # STFT -> log-magnitude spectrogram -> SpecAugment with dynamic masks
         spectrograms = []
         for signal in x:
+            # Ensure signal length >= n_fft to avoid STFT padding errors
+            if signal.shape[0] < self.n_fft:
+                pad_amt = self.n_fft - signal.shape[0]
+                signal = F.pad(signal, (0, pad_amt))  # zero-pad at end up to n_fft
+                
             window = torch.hann_window(self.n_fft, device=signal.device)
             S = torch.stft(signal,
                            n_fft=self.n_fft,
