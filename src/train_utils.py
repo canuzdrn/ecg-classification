@@ -71,6 +71,6 @@ def evaluate(model, dataloader, loss_fn, device):
     f1 = f1_score(all_labels, all_preds, average="macro")  # using macro average for class balance
 
     # uncomment below line to log -- observe whether there is any one-class collapse situation
-    print("Unique predictions:", np.unique(all_preds, return_counts=True))
+    #print("Unique predictions:", np.unique(all_preds, return_counts=True))
 
     return avg_loss, acc, f1

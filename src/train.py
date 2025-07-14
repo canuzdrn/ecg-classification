@@ -4,7 +4,7 @@ import torch
 from torch.optim.lr_scheduler import OneCycleLR
 from src.train_utils import evaluate
 
-def train_model(model, train_loader, val_loader, optimizer, loss_fn, device, num_epochs=10):
+def train_model(model, train_loader, val_loader, optimizer, loss_fn, device, num_epochs=10, verbose = True):
     """
     trains a pytorch model over multiple epochs and evaluates it on a validation set after each epoch.
     
@@ -61,9 +61,10 @@ def train_model(model, train_loader, val_loader, optimizer, loss_fn, device, num
         duration = time.time() - start_time
 
         # logs
-        print(f"Epoch {epoch:02d} | Time: {duration:.1f}s")
-        print(f"  Train Loss: {train_loss:.4f} | Acc: {train_acc:.4f} | F1: {train_f1:.4f}")
-        print(f"  Val   Loss: {val_loss:.4f} | Acc: {val_acc:.4f} | F1: {val_f1:.4f}")
+        if verbose:
+            print(f"Epoch {epoch:02d} | Time: {duration:.1f}s")
+            print(f"  Train Loss: {train_loss:.4f} | Acc: {train_acc:.4f} | F1: {train_f1:.4f}")
+            print(f"  Val   Loss: {val_loss:.4f} | Acc: {val_acc:.4f} | F1: {val_f1:.4f}")
 
         # save best model
         if val_f1 > best_f1:
@@ -73,5 +74,6 @@ def train_model(model, train_loader, val_loader, optimizer, loss_fn, device, num
     # Load best model (exited loop)
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
+        print("Training done, model is saved.\n")
 
     return model, history
