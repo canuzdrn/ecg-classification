@@ -70,13 +70,13 @@ def prep_batch_noisy_shifting(batch, noise_std=0.01, max_shift_fraction=0.1):
         shifted_s = torch.zeros_like(s, device=s.device) # Initialize with zeros, on the same device as signal
 
         if shift > 0: # Shift signal to the right (pad beginning with zeros)
-            # Example: [1,2,3,4,5], shift=2 -> [0,0,1,2,3]
+            # e.g.: [1,2,3,4,5], shift=2 -> [0,0,1,2,3]
             shifted_s[shift:] = s[:-shift]
         elif shift < 0: # Shift signal to the left (pad end with zeros)
-            # Example: [1,2,3,4,5], shift=-2 -> [3,4,5,0,0]
+            # e.g.: [1,2,3,4,5], shift=-2 -> [3,4,5,0,0]
             shifted_s[:shift] = s[-shift:]
         else: # No shift
-            shifted_s = s # No change if shift is 0
+            shifted_s = s
 
         # Add Gaussian noise to the shifted signal
         noisy_shifted_s = shifted_s + torch.randn_like(shifted_s) * noise_std
