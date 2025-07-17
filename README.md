@@ -1,4 +1,4 @@
-# eeg-amls
+# ECG Time Series Classification
 
 ### Installing Dependencies
 
